@@ -1,2 +1,2 @@
 # daycare
-Daycare Budget for my GF, just a personal project
+personal project to help my GF with income/outcome from daycare
