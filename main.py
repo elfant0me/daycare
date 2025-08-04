@@ -387,9 +387,6 @@ def main():
                 st.error(f"Erreur lors de la génération du PDF annuel: {e}")
 
     app = GarderieBudget(user_id)
-    # Le reste de l'application reste inchangé à partir d'ici (UI, tabs, graphiques, boutons, etc.)
 
 if __name__ == "__main__":
     main()
-# Le contenu du script a été précédemment mis à jour, mais a été perdu à cause du reset.
-# Nous allons le réécrire automatiquement si nécessaire.
