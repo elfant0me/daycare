@@ -11,6 +11,7 @@ from reportlab.lib.units import inch
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 import io
+import re
 
 # Configuration de la page
 try:
@@ -21,6 +22,16 @@ try:
     )
 except Exception:
     pass  # Ignore si déjà configuré
+
+# Définir les couleurs modernes
+LIGHT_BLUE = colors.HexColor('#e6f0ff')
+DARK_BLUE = colors.HexColor('#003366')
+LIGHT_GREEN = colors.HexColor('#e6fff2')
+DARK_GREEN = colors.HexColor('#006633')
+LIGHT_RED = colors.HexColor('#fff2e6')
+DARK_RED = colors.HexColor('#cc5200')
+GREY_TEXT = colors.HexColor('#555555')
+LINE_COLOR = colors.HexColor('#cccccc')
 
 class GarderieBudget:
     def __init__(self):
@@ -168,171 +179,140 @@ class GarderieBudget:
             annual_data['grand_totals']['revenues'] - annual_data['grand_totals']['expenses']
         )
         return annual_data
-        
+    
     def generate_monthly_pdf(self, year: int, month: int) -> bytes:
-        """Générer un PDF pour un mois spécifique"""
+        """Générer un PDF pour un mois spécifique avec une apparence modernisée"""
         buffer = io.BytesIO()
         
         # Créer le document PDF
-        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.5*inch)
+        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.75*inch, bottomMargin=0.75*inch, leftMargin=0.75*inch, rightMargin=0.75*inch)
         story = []
         
         # Styles
         styles = getSampleStyleSheet()
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=18,
-            textColor=colors.darkblue,
-            alignment=TA_CENTER,
-            spaceAfter=20
-        )
-        
-        subtitle_style = ParagraphStyle(
-            'CustomSubtitle',
-            parent=styles['Heading2'],
-            fontSize=14,
-            textColor=colors.darkgreen,
-            spaceAfter=10
-        )
-        
-        # Titre principal
-        title = Paragraph(f"<b>Rapport Budgétaire - {self.months[month]} {year}</b>", title_style)
-        story.append(title)
-        story.append(Spacer(1, 0.2*inch))
+        styles.add(ParagraphStyle(name='TitleStyle', fontName='Helvetica-Bold', fontSize=24, alignment=TA_CENTER, textColor=DARK_BLUE, spaceAfter=16))
+        styles.add(ParagraphStyle(name='SubtitleStyle', fontName='Helvetica-Bold', fontSize=16, alignment=TA_LEFT, textColor=DARK_BLUE, spaceAfter=8, spaceBefore=16))
+        styles.add(ParagraphStyle(name='SummaryHeader', fontName='Helvetica-Bold', fontSize=12, textColor=DARK_BLUE, alignment=TA_LEFT))
+        styles.add(ParagraphStyle(name='SummaryValue', fontName='Helvetica', fontSize=12, alignment=TA_RIGHT))
+        styles.add(ParagraphStyle(name='FooterStyle', fontName='Helvetica-Oblique', fontSize=8, textColor=colors.grey, alignment=TA_CENTER))
+        styles.add(ParagraphStyle(name='TableCaption', fontName='Helvetica-Bold', fontSize=12, textColor=GREY_TEXT, spaceAfter=6))
+        styles.add(ParagraphStyle(name='NoteStyle', fontName='Helvetica', fontSize=10, textColor=GREY_TEXT, leading=14, spaceAfter=12))
+
+        # En-tête personnalisé pour le titre
+        story.append(Paragraph(f"Rapport Budgétaire Mensuel", styles['TitleStyle']))
+        story.append(Paragraph(f"<b>Période:</b> {self.months[month]} {year}", styles['SummaryHeader']))
+        story.append(Spacer(1, 0.5*inch))
         
         # Obtenir les données du mois
         month_data = self.get_month_data(year, month)
         totals = self.calculate_totals(year, month)
         
-        # Résumé financier
+        # Section Résumé financier
+        story.append(Paragraph("Résumé Financier", styles['SubtitleStyle']))
+        
         summary_data = [
-            ['Résumé Financier', '', ''],
-            ['Total Revenus', f"{totals['revenues']:,.2f} $", ''],
-            ['Total Dépenses', f"{totals['expenses']:,.2f} $", ''],
-            ['Résultat Net', f"{totals['net_income']:,.2f} $", 
-             'Positif' if totals['net_income'] >= 0 else 'Négatif']
+            ['Revenus', f"{totals['revenues']:,.2f} $"],
+            ['Dépenses', f"{totals['expenses']:,.2f} $"],
+            ['Résultat Net', f"{totals['net_income']:,.2f} $"],
         ]
-        
-        summary_table = Table(summary_data, colWidths=[2.5*inch, 1.5*inch, 1.5*inch])
-        summary_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 12),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-            ('TEXTCOLOR', (0, -1), (1, -1), 
-             colors.green if totals['net_income'] >= 0 else colors.red),
-        ]))
-        
+
+        summary_table_style = [
+            ('BOX', (0,0), (-1,-1), 0.5, LINE_COLOR),
+            ('BACKGROUND', (0,0), (-1,-1), LIGHT_BLUE),
+            ('GRID', (0,0), (-1,-1), 0.5, LINE_COLOR),
+            ('ALIGN', (0,0), (0,-1), 'LEFT'),
+            ('ALIGN', (1,0), (1,-1), 'RIGHT'),
+            ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
+            ('FONTNAME', (1,0), (1,-1), 'Helvetica'),
+            ('FONTSIZE', (0,0), (-1,-1), 12),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+            ('TOPPADDING', (0,0), (-1,-1), 8),
+            ('BACKGROUND', (0, -1), (0, -1), LIGHT_BLUE), # Ligne résultat net
+            ('BACKGROUND', (1, -1), (1, -1), LIGHT_BLUE), # Couleur pour le résultat
+            ('TEXTCOLOR', (1, -1), (1, -1), colors.green if totals['net_income'] >= 0 else colors.red),
+            ('FONTNAME', (1,-1), (1,-1), 'Helvetica-Bold'),
+        ]
+
+        summary_table = Table(summary_data, colWidths=[2.5*inch, 2.5*inch])
+        summary_table.setStyle(TableStyle(summary_table_style))
         story.append(summary_table)
         story.append(Spacer(1, 0.3*inch))
-        
+
         # Section Revenus
         if month_data['revenues']:
-            story.append(Paragraph("REVENUS", subtitle_style))
-            
+            story.append(Paragraph("Détails des Revenus", styles['SubtitleStyle']))
             revenue_data = [['Catégorie', 'Description', 'Date', 'Montant']]
-            revenue_total = 0
-            
             for revenue in month_data['revenues']:
                 revenue_data.append([
                     revenue['category'],
-                    revenue['description'][:30] + '...' if len(revenue['description']) > 30 else revenue['description'],
+                    revenue['description'][:40] + '...' if len(revenue['description']) > 40 else revenue['description'],
                     revenue['date'],
                     f"{revenue['amount']:,.2f} $"
                 ])
-                revenue_total += revenue['amount']
             
-            # Ligne de total
-            revenue_data.append(['', '', 'TOTAL REVENUS', f"{revenue_total:,.2f} $"])
-            
-            revenue_table = Table(revenue_data, colWidths=[1.8*inch, 2.2*inch, 1*inch, 1*inch])
+            revenue_table = Table(revenue_data, colWidths=[1.5*inch, 2.5*inch, 1*inch, 1*inch])
             revenue_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgreen),
+                ('BACKGROUND', (0, 0), (-1, 0), DARK_GREEN),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('ALIGN', (2, 0), (2, -1), 'CENTER'),
+                ('ALIGN', (3, 0), (3, -1), 'RIGHT'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, -1), 9),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-                ('BACKGROUND', (0, 1), (-1, -2), colors.white),
-                ('BACKGROUND', (0, -1), (-1, -1), colors.lightgreen),
-                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('ALIGN', (3, 1), (3, -1), 'RIGHT'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+                ('BACKGROUND', (0, 1), (-1, -1), LIGHT_GREEN),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.white),
             ]))
-            
             story.append(revenue_table)
-            story.append(Spacer(1, 0.2*inch))
+            story.append(Spacer(1, 0.3*inch))
         
         # Section Dépenses
         if month_data['expenses']:
-            story.append(Paragraph("DÉPENSES", subtitle_style))
-            
+            story.append(Paragraph("Détails des Dépenses", styles['SubtitleStyle']))
             expense_data = [['Catégorie', 'Description', 'Date', 'Montant']]
-            expense_total = 0
-            
             for expense in month_data['expenses']:
                 expense_data.append([
                     expense['category'],
-                    expense['description'][:30] + '...' if len(expense['description']) > 30 else expense['description'],
+                    expense['description'][:40] + '...' if len(expense['description']) > 40 else expense['description'],
                     expense['date'],
                     f"{expense['amount']:,.2f} $"
                 ])
-                expense_total += expense['amount']
             
-            # Ligne de total
-            expense_data.append(['', '', 'TOTAL DÉPENSES', f"{expense_total:,.2f} $"])
-            
-            expense_table = Table(expense_data, colWidths=[1.8*inch, 2.2*inch, 1*inch, 1*inch])
+            expense_table = Table(expense_data, colWidths=[1.5*inch, 2.5*inch, 1*inch, 1*inch])
             expense_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightcoral),
+                ('BACKGROUND', (0, 0), (-1, 0), DARK_RED),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('ALIGN', (2, 0), (2, -1), 'CENTER'),
+                ('ALIGN', (3, 0), (3, -1), 'RIGHT'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, -1), 9),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-                ('BACKGROUND', (0, 1), (-1, -2), colors.white),
-                ('BACKGROUND', (0, -1), (-1, -1), colors.lightcoral),
-                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('ALIGN', (3, 1), (3, -1), 'RIGHT'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+                ('BACKGROUND', (0, 1), (-1, -1), LIGHT_RED),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.white),
             ]))
-            
             story.append(expense_table)
-            story.append(Spacer(1, 0.2*inch))
+            story.append(Spacer(1, 0.3*inch))
         
         # Section Notes
         if month_data.get('notes', '').strip():
-            story.append(Paragraph("NOTES ET COMMENTAIRES", subtitle_style))
-            notes_style = ParagraphStyle(
-                'Notes',
-                parent=styles['Normal'],
-                fontSize=10,
-                leftIndent=20,
-                rightIndent=20,
-                spaceAfter=10
-            )
-            story.append(Paragraph(month_data['notes'], notes_style))
+            story.append(Paragraph("Notes et Commentaires", styles['SubtitleStyle']))
+            # Remplacer les sauts de ligne pour ReportLab
+            notes_text = re.sub(r'\n', '<br/>', month_data['notes'])
+            story.append(Paragraph(notes_text, styles['NoteStyle']))
             story.append(Spacer(1, 0.2*inch))
         
-        # Pied de page avec date de génération
-        footer_style = ParagraphStyle(
-            'Footer',
-            parent=styles['Normal'],
-            fontSize=8,
-            textColor=colors.grey,
-            alignment=TA_CENTER
-        )
-        story.append(Spacer(1, 0.3*inch))
-        story.append(Paragraph(f"Rapport généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')}", footer_style))
-        
+        # Fonction pour le pied de page
+        def add_footer(canvas, doc):
+            canvas.saveState()
+            canvas.setFont('Helvetica-Oblique', 8)
+            canvas.setFillColor(colors.grey)
+            footer_text = f"Rapport généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')}"
+            canvas.drawCentredString(A4[0]/2, 0.5 * inch, footer_text)
+            canvas.restoreState()
+
         # Construire le PDF
-        doc.build(story)
+        doc.build(story, onFirstPage=add_footer, onLaterPages=add_footer)
         buffer.seek(0)
         return buffer.getvalue()
 
